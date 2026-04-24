@@ -3,6 +3,8 @@ import './globals.css'
 import { AuthProvider } from '@/context/AuthContext'
 import { EditModeProvider } from '@/context/EditModeContext'
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: '弁当スコア',
   description: '弁当のおかずをスコアリングするアプリ',
