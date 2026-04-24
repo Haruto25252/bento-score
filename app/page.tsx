@@ -15,6 +15,8 @@ type SortOrder = 'created' | 'tier'
 function BentoCard({ bento, allScores }: { bento: Bento; allScores: number[] }) {
   const score = bento.score ?? 0
   const tier = calcTier(score, allScores)
+  const count = bento.bento_side_dishes?.length ?? 0
+  const avg = count > 0 ? score / count : null
 
   return (
     <Link href={`/bento/${bento.id}`}>
@@ -35,6 +37,11 @@ function BentoCard({ bento, allScores }: { bento: Bento; allScores: number[] }) 
           <p className="text-[var(--gold)] font-bold text-sm mt-1">
             {score > 0 ? `+${score}` : score} pts
           </p>
+          {avg !== null && (
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              平均 {avg > 0 ? `+${avg.toFixed(1)}` : avg.toFixed(1)}/皿
+            </p>
+          )}
         </div>
       </div>
     </Link>
