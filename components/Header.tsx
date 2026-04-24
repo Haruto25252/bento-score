@@ -12,7 +12,12 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-40 bg-[var(--bg-card)] border-b border-[var(--border)]">
       <div className="max-w-[430px] mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href="/" className="text-[var(--gold)] font-bold text-lg tracking-wide">
+        <Link
+          href="/"
+          className={`font-bold text-lg tracking-wide transition-colors ${
+            pathname === '/side-dishes' ? 'text-[var(--text-muted)]' : 'text-[var(--gold)]'
+          }`}
+        >
           🍱 弁当スコア
         </Link>
         <div className="flex items-center gap-2">
