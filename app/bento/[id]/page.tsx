@@ -201,6 +201,8 @@ export default function BentoDetailPage({ params }: PageProps) {
   )
   const tier = calcTier(score, allScores)
   const displayPhoto = photoPreview ?? bento.photo_url
+  const sideDishCount = (bento.bento_side_dishes ?? []).length
+  const avg = sideDishCount > 0 ? score / sideDishCount : null
 
   return (
     <AuthGuard>
@@ -250,9 +252,16 @@ export default function BentoDetailPage({ params }: PageProps) {
             <div>
               <h1 className="text-xl font-bold">{bento.name}</h1>
               <p className="text-sm text-[var(--text-muted)]">{bento.store_name}</p>
-              <p className="text-[var(--gold)] font-bold text-lg mt-1">
-                {score > 0 ? `+${score}` : score} pts
-              </p>
+              <div className="flex items-baseline gap-3 mt-1">
+                <p className="text-[var(--gold)] font-bold text-lg">
+                  {score > 0 ? `+${score}` : score} pts
+                </p>
+                {avg !== null && (
+                  <p className="text-sm text-[var(--text-muted)]">
+                    平均 {avg > 0 ? `+${avg.toFixed(1)}` : avg.toFixed(1)}/皿
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
