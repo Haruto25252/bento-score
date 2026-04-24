@@ -25,6 +25,11 @@
   box-sizing: border-box;
 }
 
+/* iOSがinputフォーカス時にズームするのを防ぐ（font-size < 16pxが原因） */
+input, select, textarea {
+  font-size: max(16px, 1em);
+}
+
 html {
   overflow-x: hidden;
 }
