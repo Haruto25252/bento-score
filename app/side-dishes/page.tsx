@@ -29,6 +29,7 @@ function SideDishCard({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState(sd.name)
   const [scores, setScores] = useState({
     appearance: sd.appearance,
     taste: sd.taste,
@@ -41,11 +42,12 @@ function SideDishCard({
   const [saving, setSaving] = useState(false)
 
   const handleSave = async () => {
+    if (!editName.trim()) return
     setSaving(true)
     try {
       let photo_url = sd.photo_url
       if (photoFile) photo_url = await uploadImage(photoFile, 'side-dish-photos')
-      await supabase.from('side_dishes').update({ ...scores, photo_url }).eq('id', sd.id)
+      await supabase.from('side_dishes').update({ name: editName.trim(), ...scores, photo_url }).eq('id', sd.id)
       onSaved()
       setEditing(false)
       setPhotoFile(null)
@@ -84,7 +86,15 @@ function SideDishCard({
         <div className="px-4 pb-4 space-y-3 border-t border-[var(--border)] pt-3">
           {editing ? (
             <>
-              <div className="flex items-center gap-3 mb-2">
+              <div>
+                <label className="text-xs text-[var(--text-muted)] mb-1 block">おかず名</label>
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--gold)]"
+                />
+              </div>
+              <div className="flex items-center gap-3">
                 <div className="relative">
                   {displayPhoto ? (
                     <img src={displayPhoto} alt="" className="w-14 h-14 rounded-xl object-cover" />
@@ -137,6 +147,7 @@ function SideDishCard({
                 <button
                   onClick={() => {
                     setEditing(false)
+                    setEditName(sd.name)
                     setScores({
                       appearance: sd.appearance,
                       taste: sd.taste,
