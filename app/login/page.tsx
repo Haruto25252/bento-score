@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext'
 
 export default function LoginPage() {
   const [passphrase, setPassphrase] = useState('')
+  const [showPassphrase, setShowPassphrase] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login, isAuthenticated, isLoading } = useAuth()
@@ -51,14 +52,23 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="bg-[var(--bg-card)] rounded-2xl p-6 space-y-4">
           <div>
             <label className="text-xs text-[var(--text-muted)] mb-1.5 block">あいことば</label>
-            <input
-              type="password"
-              value={passphrase}
-              onChange={(e) => setPassphrase(e.target.value)}
-              className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[var(--gold)] transition-colors"
-              placeholder="パスワードを入力..."
-              autoFocus
-            />
+            <div className="relative">
+              <input
+                type={showPassphrase ? 'text' : 'password'}
+                value={passphrase}
+                onChange={(e) => setPassphrase(e.target.value)}
+                className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-xl px-4 py-3 pr-16 text-sm focus:outline-none focus:border-[var(--gold)] transition-colors"
+                placeholder="あいことばを入力..."
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassphrase((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+              >
+                {showPassphrase ? '隠す' : '表示'}
+              </button>
+            </div>
           </div>
 
           {error && (
