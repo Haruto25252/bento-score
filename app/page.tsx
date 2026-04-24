@@ -1,65 +1,159 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
+import { Bento } from '@/lib/types'
+import { calcBentoScore, calcTier } from '@/lib/tier'
+import TierBadge from '@/components/TierBadge'
+import AuthGuard from '@/components/AuthGuard'
+import Header from '@/components/Header'
+import { useEditMode } from '@/context/EditModeContext'
+
+type SortOrder = 'created' | 'tier'
+
+function BentoCard({ bento, allScores }: { bento: Bento; allScores: number[] }) {
+  const score = bento.score ?? 0
+  const tier = calcTier(score, allScores)
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <Link href={`/bento/${bento.id}`}>
+      <div className="bg-[var(--bg-card)] rounded-2xl overflow-hidden border border-[var(--border)] hover:border-[var(--gold)] transition-colors active:opacity-80">
+        <div className="relative h-44 bg-[#0f3460]">
+          {bento.photo_url ? (
+            <img src={bento.photo_url} alt={bento.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-4xl">🍱</div>
+          )}
+          <div className="absolute top-2 right-2">
+            <TierBadge tier={tier} size="lg" />
+          </div>
+        </div>
+        <div className="p-3">
+          <p className="font-bold text-sm truncate">{bento.name}</p>
+          <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{bento.store_name}</p>
+          <p className="text-[var(--gold)] font-bold text-sm mt-1">
+            {score > 0 ? `+${score}` : score} pts
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </div>
+    </Link>
+  )
+}
+
+export default function HomePage() {
+  const [bentos, setBentos] = useState<Bento[]>([])
+  const [sortOrder, setSortOrder] = useState<SortOrder>('created')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [loading, setLoading] = useState(true)
+  const { editMode } = useEditMode()
+
+  const fetchBentos = useCallback(async () => {
+    const { data } = await supabase
+      .from('bentos')
+      .select(`
+        *,
+        bento_side_dishes (
+          id, bento_id, side_dish_id,
+          side_dishes (*)
+        )
+      `)
+      .order('created_at', { ascending: false })
+
+    if (data) {
+      const enriched = data.map((b) => ({
+        ...b,
+        score: calcBentoScore(
+          (b.bento_side_dishes ?? []).map((bsd: { side_dishes: { total: number } }) => bsd.side_dishes?.total ?? 0)
+        ),
+      }))
+      setBentos(enriched)
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetchBentos()
+  }, [fetchBentos])
+
+  const allScores = bentos.map((b) => b.score ?? 0)
+
+  const filtered = bentos.filter((b) => {
+    if (!searchQuery.trim()) return true
+    const q = searchQuery.toLowerCase()
+    const nameMatch = b.name.toLowerCase().includes(q) || b.store_name.toLowerCase().includes(q)
+    const sideMatch = (b.bento_side_dishes ?? []).some((bsd: { side_dishes: { name: string } }) =>
+      bsd.side_dishes?.name?.toLowerCase().includes(q)
+    )
+    return nameMatch || sideMatch
+  })
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (sortOrder === 'tier') return (b.score ?? 0) - (a.score ?? 0)
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+
+  return (
+    <AuthGuard>
+      <Header />
+      <main className="max-w-[430px] mx-auto px-4 py-4 pb-24">
+        {/* Search */}
+        <div className="mb-3">
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[var(--gold)] transition-colors"
+            placeholder="弁当名・おかず名で検索..."
+          />
         </div>
+
+        {/* Sort */}
+        <div className="flex gap-2 mb-4">
+          {(['created', 'tier'] as SortOrder[]).map((o) => (
+            <button
+              key={o}
+              onClick={() => setSortOrder(o)}
+              className={`px-3 py-1 rounded-full text-xs transition-colors ${
+                sortOrder === o
+                  ? 'bg-[var(--gold)] text-[#1a1a2e] font-bold'
+                  : 'bg-[#2a2a4e] text-[var(--text-muted)]'
+              }`}
+            >
+              {o === 'created' ? '追加順' : 'ティア順'}
+            </button>
+          ))}
+        </div>
+
+        {/* List */}
+        {loading ? (
+          <div className="flex justify-center mt-16">
+            <div className="w-8 h-8 border-2 border-[var(--gold)] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : sorted.length === 0 ? (
+          <div className="text-center mt-16 text-[var(--text-muted)]">
+            <div className="text-4xl mb-3">🍱</div>
+            <p className="text-sm">
+              {searchQuery ? '見つかりませんでした' : 'まだ弁当がありません'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {sorted.map((bento) => (
+              <BentoCard key={bento.id} bento={bento} allScores={allScores} />
+            ))}
+          </div>
+        )}
+
+        {/* FAB */}
+        {editMode && (
+          <Link
+            href="/bento/new"
+            className="fixed bottom-6 right-4 w-14 h-14 rounded-full bg-[var(--gold)] text-[#1a1a2e] flex items-center justify-center shadow-lg text-2xl hover:opacity-90 transition-opacity z-40"
+          >
+            +
+          </Link>
+        )}
       </main>
-    </div>
-  );
+    </AuthGuard>
+  )
 }
