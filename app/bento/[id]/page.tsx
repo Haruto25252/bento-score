@@ -17,6 +17,14 @@ interface PageProps {
   params: Promise<{ id: string }>
 }
 
+const SD_PARAMS: { key: keyof Pick<SideDish, 'appearance' | 'taste' | 'ease' | 'smell' | 'texture'>; label: string }[] = [
+  { key: 'appearance', label: '見た目' },
+  { key: 'taste', label: '味' },
+  { key: 'ease', label: '食べやすさ' },
+  { key: 'smell', label: '匂い' },
+  { key: 'texture', label: '触感' },
+]
+
 export default function BentoDetailPage({ params }: PageProps) {
   const { id } = use(params)
   const router = useRouter()
@@ -31,6 +39,14 @@ export default function BentoDetailPage({ params }: PageProps) {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // おかずインライン編集
+  const [editingSdId, setEditingSdId] = useState<string | null>(null)
+  const [editSdName, setEditSdName] = useState('')
+  const [editSdScores, setEditSdScores] = useState({ appearance: 0, taste: 0, ease: 0, smell: 0, texture: 0 })
+  const [editSdPhotoFile, setEditSdPhotoFile] = useState<File | null>(null)
+  const [editSdPhotoPreview, setEditSdPhotoPreview] = useState<string | null>(null)
+  const [savingSd, setSavingSd] = useState(false)
 
   const fetchBento = useCallback(async () => {
     const [{ data: bentoData }, { data: allBentosData }] = await Promise.all([
@@ -118,6 +134,46 @@ export default function BentoDetailPage({ params }: PageProps) {
     await supabase.from('bento_side_dishes').delete().eq('bento_id', id)
     await supabase.from('bentos').delete().eq('id', id)
     router.replace('/')
+  }
+
+  const startEditSd = (sd: SideDish) => {
+    setEditingSdId(sd.id)
+    setEditSdName(sd.name)
+    setEditSdScores({
+      appearance: sd.appearance,
+      taste: sd.taste,
+      ease: sd.ease,
+      smell: sd.smell,
+      texture: sd.texture,
+    })
+    setEditSdPhotoFile(null)
+    setEditSdPhotoPreview(null)
+  }
+
+  const cancelEditSd = () => {
+    setEditingSdId(null)
+    setEditSdPhotoFile(null)
+    setEditSdPhotoPreview(null)
+  }
+
+  const handleSaveSd = async (sd: SideDish) => {
+    if (!editSdName.trim()) return
+    setSavingSd(true)
+    try {
+      let photo_url = sd.photo_url
+      if (editSdPhotoFile) photo_url = await uploadImage(editSdPhotoFile, 'side-dish-photos')
+      await supabase.from('side_dishes').update({
+        name: editSdName.trim(),
+        ...editSdScores,
+        photo_url,
+      }).eq('id', sd.id)
+      setEditingSdId(null)
+      setEditSdPhotoFile(null)
+      setEditSdPhotoPreview(null)
+      fetchBento()
+    } finally {
+      setSavingSd(false)
+    }
   }
 
   if (loading) {
@@ -212,15 +268,18 @@ export default function BentoDetailPage({ params }: PageProps) {
               {(bento.bento_side_dishes ?? []).map((bsd: BentoSideDish) => {
                 const sd = bsd.side_dishes
                 if (!sd) return null
+                const isEditingThis = editingSdId === sd.id
+                const sdDisplayPhoto = isEditingThis ? (editSdPhotoPreview ?? sd.photo_url) : sd.photo_url
+
                 return (
                   <div
                     key={bsd.id}
                     className="bg-[var(--bg-card)] rounded-2xl p-4 border border-[var(--border)]"
                   >
                     <div className="flex items-center gap-3 mb-3">
-                      {sd.photo_url ? (
+                      {sdDisplayPhoto ? (
                         <img
-                          src={sd.photo_url}
+                          src={sdDisplayPhoto}
                           alt={sd.name}
                           className="w-12 h-12 rounded-xl object-cover shrink-0"
                         />
@@ -228,12 +287,16 @@ export default function BentoDetailPage({ params }: PageProps) {
                         <div className="w-12 h-12 rounded-xl bg-[#2a2a4e] shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{sd.name}</p>
+                        <p className="font-medium text-sm truncate">
+                          {isEditingThis ? editSdName : sd.name}
+                        </p>
                         <p className="text-xs text-[var(--gold)] font-mono mt-0.5">
-                          {sd.total > 0 ? `+${sd.total}` : sd.total} pts
+                          {isEditingThis
+                            ? Object.values(editSdScores).reduce((a, b) => a + b, 0)
+                            : sd.total > 0 ? `+${sd.total}` : sd.total} pts
                         </p>
                       </div>
-                      {editMode && (
+                      {editMode && !isEditingThis && (
                         <button
                           onClick={() => handleRemoveSideDish(bsd.id)}
                           className="text-[var(--text-muted)] hover:text-red-400 transition-colors shrink-0"
@@ -242,13 +305,88 @@ export default function BentoDetailPage({ params }: PageProps) {
                         </button>
                       )}
                     </div>
-                    <div className="space-y-1.5">
-                      <ScoreBar label="見た目" value={sd.appearance} />
-                      <ScoreBar label="味" value={sd.taste} />
-                      <ScoreBar label="食べやすさ" value={sd.ease} />
-                      <ScoreBar label="匂い" value={sd.smell} />
-                      <ScoreBar label="触感" value={sd.texture} />
-                    </div>
+
+                    {isEditingThis ? (
+                      /* インライン編集フォーム */
+                      <div className="space-y-3 border-t border-[var(--border)] pt-3">
+                        <div>
+                          <label className="text-xs text-[var(--text-muted)] mb-1 block">おかず名</label>
+                          <input
+                            value={editSdName}
+                            onChange={(e) => setEditSdName(e.target.value)}
+                            className="w-full bg-[var(--bg-input)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--gold)]"
+                          />
+                        </div>
+                        <label className="cursor-pointer inline-flex items-center gap-2 bg-[#2a2a4e] hover:bg-[#3a3a5e] text-xs px-3 py-1.5 rounded-lg transition-colors">
+                          📷 写真を変更
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0]
+                              if (f) {
+                                setEditSdPhotoFile(f)
+                                setEditSdPhotoPreview(URL.createObjectURL(f))
+                              }
+                            }}
+                          />
+                        </label>
+                        {SD_PARAMS.map(({ key, label }) => (
+                          <div key={key}>
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-xs text-[var(--text-muted)]">{label}</span>
+                              <span className="text-xs font-mono font-bold text-[var(--gold)]">
+                                {editSdScores[key] > 0 ? `+${editSdScores[key]}` : editSdScores[key]}
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={-10}
+                              max={10}
+                              value={editSdScores[key]}
+                              onChange={(e) =>
+                                setEditSdScores((s) => ({ ...s, [key]: Number(e.target.value) }))
+                              }
+                            />
+                          </div>
+                        ))}
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            onClick={cancelEditSd}
+                            className="flex-1 py-2 rounded-xl bg-[#2a2a4e] text-xs hover:bg-[#3a3a5e] transition-colors"
+                          >
+                            キャンセル
+                          </button>
+                          <button
+                            onClick={() => handleSaveSd(sd)}
+                            disabled={savingSd || !editSdName.trim()}
+                            className="flex-1 py-2 rounded-xl bg-[var(--gold)] text-[#1a1a2e] text-xs font-bold hover:opacity-90 disabled:opacity-50 transition-opacity"
+                          >
+                            {savingSd ? '保存中...' : '保存'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* 通常表示 */
+                      <>
+                        <div className="space-y-1.5">
+                          <ScoreBar label="見た目" value={sd.appearance} />
+                          <ScoreBar label="味" value={sd.taste} />
+                          <ScoreBar label="食べやすさ" value={sd.ease} />
+                          <ScoreBar label="匂い" value={sd.smell} />
+                          <ScoreBar label="触感" value={sd.texture} />
+                        </div>
+                        {editMode && (
+                          <button
+                            onClick={() => startEditSd(sd)}
+                            className="mt-3 w-full py-2 rounded-xl bg-[#2a2a4e] text-xs hover:bg-[#3a3a5e] transition-colors border border-[var(--border)]"
+                          >
+                            このおかずを編集
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
                 )
               })}
