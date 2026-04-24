@@ -13,7 +13,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja" className="h-full">
-      <body className="min-h-full flex flex-col">
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+      </head>
+      <body className="min-h-full flex flex-col overflow-x-hidden">
         <AuthProvider>
           <EditModeProvider>{children}</EditModeProvider>
         </AuthProvider>

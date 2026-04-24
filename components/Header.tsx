@@ -19,17 +19,17 @@ export default function Header() {
           <EditToggle />
           <Link
             href="/side-dishes"
-            className={`text-xs px-2 py-1.5 rounded-lg transition-colors ${
+            className={`text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
               pathname === '/side-dishes'
-                ? 'bg-[var(--gold)] text-[#1a1a2e]'
-                : 'text-[var(--text-muted)] hover:text-[var(--text)]'
+                ? 'bg-[var(--gold)] text-[#1a1a2e] border-[var(--gold)] font-medium'
+                : 'text-[var(--text-muted)] border-[var(--border)] hover:text-[var(--text)] hover:border-[var(--text-muted)]'
             }`}
           >
             おかず
           </Link>
           <button
             onClick={logout}
-            className="text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+            className="text-xs text-[var(--text-muted)] px-2.5 py-1.5 rounded-lg border border-[var(--border)] hover:text-red-400 hover:border-red-400/50 transition-colors"
           >
             ログアウト
           </button>
